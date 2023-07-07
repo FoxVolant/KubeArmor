@@ -3,6 +3,7 @@ include Makefile.vars
 .PHONY: all
 all: kernel_headers libbpf syscall_test system_monitor.bpf.o system_monitor.container.bpf.o system_monitor.host.bpf.o
 
+#生成 vmlinux.h 头文件
 .PHONY: kernel_headers
 kernel_headers:
 ifeq ($(BTF_SUPPORTED),1)
@@ -20,6 +21,7 @@ else
 endif
 endif
 
+#构建 libbpf 库
 .PHONY: libbpf
 libbpf:
 ifeq (,$(wildcard $(LIBBPF)/src/libbpf.c))
@@ -29,6 +31,7 @@ ifeq (,$(wildcard $(LIBBPF)/src/libbpf.a))
 	$(Q)make -C $(LIBBPF)/src
 endif
 
+#构建 syscall_test 工具, 用于测试系统调用
 .PHONY: syscall_test
 syscall_test: tests/Makefile
 	$(Q)make -C tests KRNDIR="$(KRNDIR)"
@@ -40,6 +43,7 @@ syscall_test: tests/Makefile
 # 'opt' output to IR, and finally 'llc' generates bpf byte code.
 # Ref https://elixir.bootlin.com/linux/v5.19.5/source/samples/bpf/Makefile#L439
 
+#system_monitor的目标文件
 system_monitor.bpf.o: $(SYSMONITOR) $(VMLINUX_H) syscall_test
 	@echo "Compiling eBPF bytecode: $(GREEN)$@$(NC) ..."
 	@echo "Using Compiler flags: $(CFlags)"
