@@ -230,9 +230,9 @@ static inline int match_and_enforce_path_hooks(struct path *f_path, u32 id) {
   bool match = false;
 
   struct outer_key okey;
-  get_outer_key(&okey, t);
+  get_outer_key(&okey, t);        //获取外部键（outer_key）
 
-  u32 *inner = bpf_map_lookup_elem(&kubearmor_containers, &okey);
+  u32 *inner = bpf_map_lookup_elem(&kubearmor_containers, &okey);    //在kubearmor_containers映射中查找outer_key，获取内部映射的指针inner
 
   if (!inner) {
     return 0;
@@ -246,27 +246,36 @@ static inline int match_and_enforce_path_hooks(struct path *f_path, u32 id) {
   // "pk" is a map key which is used for all kinds of matching and lookups, We
   // needed a third key because we need to copy contents from store and keep
   // resetting the contents of this key so data in store needs to persist
+  // “z”是零值映射键，用于重置其他键的值
+   // 依次使用和更新它们来查找规则映射
+
+   //“store”存储查找规则映射所需的信息
+
+   // “pk”是一个映射键，用于各种匹配和查找，我们
+   // 需要第三个密钥，因为我们需要从存储复制内容并保留
+   // 重置此键的内容，以便存储中的数据需要保留
 
   u32 zero = 0;
-  bufs_k *z = bpf_map_lookup_elem(&bufk, &zero);
+  bufs_k *z = bpf_map_lookup_elem(&bufk, &zero);    //在bufk映射中查找对应的元素，获取相应的bufs_k结构体指针：z
   if (z == NULL)
     return 0;
 
   u32 one = 1;
-  bufs_k *store = bpf_map_lookup_elem(&bufk, &one);
+  bufs_k *store = bpf_map_lookup_elem(&bufk, &one);      //同上
   if (store == NULL)
     return 0;
 
   // Reset value for store
-  bpf_map_update_elem(&bufk, &one, z, BPF_ANY);
+  bpf_map_update_elem(&bufk, &one, z, BPF_ANY);         
 
   u32 two = 2;
-  bufs_k *pk = bpf_map_lookup_elem(&bufk, &two);
+  bufs_k *pk = bpf_map_lookup_elem(&bufk, &two);         //同上
   if (pk == NULL)
     return 0;
 
   /* Extract full path from file structure provided by LSM Hook */
-  bufs_t *path_buf = get_buf(PATH_BUFFER);
+  /* 从 LSM Hook 提供的文件结构中提取完整路径 */
+  bufs_t *path_buf = get_buf(PATH_BUFFER);          //从传入的路径结构体中提取完整路径，并将其存储在path_buf
   if (path_buf == NULL)
     return 0;
 
@@ -281,10 +290,11 @@ static inline int match_and_enforce_path_hooks(struct path *f_path, u32 id) {
   bpf_probe_read_str(store->path, MAX_STRING_SIZE, path_ptr);
 
   /* Extract full path of the source binary from the task structure */
+  /* 从task结构中提取源二进制文件的完整路径 */
   struct file *file_p = get_task_file(t);
   if (file_p == NULL)
     return 0;
-  bufs_t *src_buf = get_buf(PATH_BUFFER);
+  bufs_t *src_buf = get_buf(PATH_BUFFER);        //存储在src_buf
   if (src_buf == NULL)
     return 0;
   struct path f_src = BPF_CORE_READ(file_p, f_path);
@@ -298,9 +308,9 @@ static inline int match_and_enforce_path_hooks(struct path *f_path, u32 id) {
   void *ptr = &src_buf->buf[*src_offset];
   bpf_probe_read_str(store->source, MAX_STRING_SIZE, ptr);
 
-  struct data_t *val = bpf_map_lookup_elem(inner, store);
+  struct data_t *val = bpf_map_lookup_elem(inner, store);      //在inner映射中使用store作为键，查找相应的数据结构data_t
 
-  if (val && (val->filemask & RULE_READ)) {
+  if (val && (val->filemask & RULE_READ)) {          //如果找到且具有RULE_READ标志，则将match设置为true，并跳转到决策（decision）标签
     match = true;
     goto decision;
   }
@@ -309,7 +319,7 @@ static inline int match_and_enforce_path_hooks(struct path *f_path, u32 id) {
   bool recursivebuthint = false;
 
 #pragma unroll
-  for (int i = 0; i < 64; i++) {
+  for (int i = 0; i < 64; i++) {      
     if (store->path[i] == '\0')
       break;
 
